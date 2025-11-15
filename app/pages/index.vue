@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import type { SkillNode } from '~/types/skillTree'
-import { allDecisionTreesToSkillNodes } from '~/utils/decisionTreeToSkillTree'
 
 const { createProblem, getAllTrees, findAlternativeSolution } =
   useDecisionTree()
+const toast = useToast()
 
 const selectedSkillNode = ref<SkillNode | null>(null)
 const fromNodeForAlternative = ref<SkillNode | null>(null)
 const toNodeForAlternative = ref<SkillNode | null>(null)
+const isAlternativeModeActive = ref(false)
 const decisionTrees = ref<DecisionTree[]>([])
 const isLoadingTrees = ref(true)
 
@@ -21,11 +22,26 @@ const problemGoal = ref('')
 const tags = ref<string[]>([])
 const currentTag = ref('')
 const isLoading = ref(false)
-const error = ref<string | null>(null)
 const alternativeReason = ref('')
-const showAlternativePanel = computed(
+const hasDecisionTrees = computed(() => decisionTrees.value.length > 0)
+const highlightedAlternativeNodeIds = computed(() => {
+  if (!isAlternativeModeActive.value) {
+    return []
+  }
+  const ids: string[] = []
+  if (fromNodeForAlternative.value) {
+    ids.push(fromNodeForAlternative.value.id)
+  }
+  if (toNodeForAlternative.value) {
+    ids.push(toNodeForAlternative.value.id)
+  }
+  return ids
+})
+const shouldShowSidebar = computed(
   () =>
-    !!selectedSkillNode.value && selectedSkillNode.value.id.includes('tree_'),
+    !!selectedSkillNode.value ||
+    isAlternativeModeActive.value ||
+    hasDecisionTrees.value,
 )
 
 const loadAllTrees = async () => {
@@ -35,7 +51,11 @@ const loadAllTrees = async () => {
     decisionTrees.value = trees
   } catch (e: any) {
     console.error('Ошибка при загрузке деревьев:', e)
-    error.value = 'Ошибка при загрузке деревьев'
+    toast.add({
+      title: 'Не удалось загрузить деревья',
+      description: e?.message || 'Попробуйте ещё раз позже',
+      color: 'error',
+    })
   } finally {
     isLoadingTrees.value = false
   }
@@ -63,12 +83,14 @@ const handleCreateProblem = async () => {
   const title = problemDescription.value.trim()
 
   if (!title) {
-    error.value = 'Введите название проблемы'
+    toast.add({
+      title: 'Заполните название проблемы',
+      color: 'warning',
+    })
     return
   }
 
   isLoading.value = true
-  error.value = null
 
   try {
     const response = await createProblem({
@@ -78,7 +100,11 @@ const handleCreateProblem = async () => {
     })
 
     if (response.existingTreeId) {
-      error.value = `Найдена существующая проблема: ${response.existingTreeId}`
+      toast.add({
+        title: 'Найдена похожая проблема',
+        description: `Дерево: ${response.existingTreeId}`,
+        color: 'warning',
+      })
       await loadAllTrees()
     } else if (response.newTree) {
       decisionTrees.value.push(response.newTree)
@@ -87,24 +113,56 @@ const handleCreateProblem = async () => {
       tags.value = []
     }
   } catch (e: any) {
-    error.value = e.message || 'Ошибка при создании проблемы'
+    toast.add({
+      title: 'Не удалось создать проблему',
+      description: e?.message || 'Попробуйте ещё раз позже',
+      color: 'error',
+    })
   } finally {
     isLoading.value = false
   }
 }
 
+const ensureFromBeforeTo = () => {
+  if (!fromNodeForAlternative.value || !toNodeForAlternative.value) {
+    return
+  }
+
+  const indexById = new Map<string, number>()
+  allSkillNodes.value.forEach((node, index) => {
+    indexById.set(node.id, index)
+  })
+
+  const fromIndex =
+    indexById.get(fromNodeForAlternative.value.id) ?? Number.POSITIVE_INFINITY
+  const toIndex =
+    indexById.get(toNodeForAlternative.value.id) ?? Number.POSITIVE_INFINITY
+
+  if (fromIndex > toIndex) {
+    const temp = fromNodeForAlternative.value
+    fromNodeForAlternative.value = toNodeForAlternative.value
+    toNodeForAlternative.value = temp
+  }
+}
+
 const handleSkillNodeClick = (node: SkillNode) => {
+  selectedSkillNode.value = node
+
+  if (!isAlternativeModeActive.value) {
+    return
+  }
+
   if (!fromNodeForAlternative.value) {
     fromNodeForAlternative.value = node
-    selectedSkillNode.value = node
-  } else if (
+    return
+  }
+
+  if (
     !toNodeForAlternative.value &&
     fromNodeForAlternative.value.id !== node.id
   ) {
     toNodeForAlternative.value = node
-    selectedSkillNode.value = node
-  } else {
-    selectedSkillNode.value = node
+    ensureFromBeforeTo()
   }
 }
 
@@ -113,10 +171,33 @@ const resetAlternativeSelection = () => {
   toNodeForAlternative.value = null
 }
 
+const activateAlternativeMode = () => {
+  isAlternativeModeActive.value = true
+  resetAlternativeSelection()
+  alternativeReason.value = ''
+}
+
+const deactivateAlternativeMode = () => {
+  isAlternativeModeActive.value = false
+  resetAlternativeSelection()
+  alternativeReason.value = ''
+}
+
 const handleAddAlternativeSolution = async () => {
+  if (!isAlternativeModeActive.value) {
+    toast.add({
+      title: 'Активируйте режим альтернативного пути',
+      color: 'warning',
+    })
+    return
+  }
+
   if (!fromNodeForAlternative.value || !toNodeForAlternative.value) {
-    error.value =
-      'Выберите две связанные ноды для создания альтернативного пути'
+    toast.add({
+      title: 'Выберите обе ноды',
+      description: 'Нужно указать начало и конец альтернативного пути',
+      color: 'warning',
+    })
     return
   }
 
@@ -133,12 +214,19 @@ const handleAddAlternativeSolution = async () => {
     !toMatch[1] ||
     !toMatch[2]
   ) {
-    error.value = 'Выбранные узлы не являются частью дерева решений'
+    toast.add({
+      title: 'Неверный узел',
+      description: 'Выбранная нода не принадлежит дереву',
+      color: 'warning',
+    })
     return
   }
 
   if (fromMatch[1] !== toMatch[1]) {
-    error.value = 'Узлы должны принадлежать одному дереву'
+    toast.add({
+      title: 'Выберите ноды одного дерева',
+      color: 'warning',
+    })
     return
   }
 
@@ -146,7 +234,10 @@ const handleAddAlternativeSolution = async () => {
   const tree = decisionTrees.value.find(t => t.id === treeId)
 
   if (!tree) {
-    error.value = 'Дерево не найдено'
+    toast.add({
+      title: 'Дерево не найдено',
+      color: 'error',
+    })
     return
   }
 
@@ -158,12 +249,15 @@ const handleAddAlternativeSolution = async () => {
   )
 
   if (!edgeExists) {
-    error.value = 'Выбранные узлы не связаны напрямую'
+    toast.add({
+      title: 'Нет прямой связи',
+      description: 'Эти ноды не соединены',
+      color: 'warning',
+    })
     return
   }
 
   isLoading.value = true
-  error.value = null
 
   try {
     const response = await findAlternativeSolution({
@@ -180,7 +274,7 @@ const handleAddAlternativeSolution = async () => {
       decisionTrees.value[treeIndex] = response.tree
     }
     alternativeReason.value = ''
-    resetAlternativeSelection()
+    deactivateAlternativeMode()
 
     const newNodeId = `${response.tree.id}-${response.newNodeId}`
     const newNode = allSkillNodes.value.find(n => n.id === newNodeId)
@@ -188,7 +282,11 @@ const handleAddAlternativeSolution = async () => {
       selectedSkillNode.value = newNode
     }
   } catch (e: any) {
-    error.value = e.message || 'Ошибка при добавлении альтернативного решения'
+    toast.add({
+      title: 'Не удалось добавить альтернативный путь',
+      description: e?.message || 'Попробуйте ещё раз позже',
+      color: 'error',
+    })
   } finally {
     isLoading.value = false
   }
@@ -261,10 +359,6 @@ const handleAddAlternativeSolution = async () => {
         >
           Создать проблему
         </UButton>
-
-        <div v-if="error" class="mt-4 p-3 bg-red-100 text-red-800 rounded">
-          {{ error }}
-        </div>
       </div>
 
       <div class="relative">
@@ -296,12 +390,11 @@ const handleAddAlternativeSolution = async () => {
             <SkillTree
               v-else-if="allSkillNodes.length > 0"
               :skills="allSkillNodes"
+              :mode="isAlternativeModeActive ? 'alternative' : 'default'"
               :selected-node-id="
-                fromNodeForAlternative?.id ||
-                toNodeForAlternative?.id ||
-                selectedSkillNode?.id ||
-                null
+                isAlternativeModeActive ? null : (selectedSkillNode?.id ?? null)
               "
+              :highlight-node-ids="highlightedAlternativeNodeIds"
               :width="skillTreeSettings.viewport.width"
               :height="skillTreeSettings.viewport.height"
               :vertical-gap="skillTreeSettings.layout.verticalGap"
@@ -321,21 +414,34 @@ const handleAddAlternativeSolution = async () => {
         </UCard>
 
         <div
-          v-if="selectedSkillNode || showAlternativePanel"
+          v-if="shouldShowSidebar"
           class="absolute top-16 right-1 w-[350px] z-10 flex flex-col gap-4"
         >
-          <AlternativePathPanel
-            v-if="showAlternativePanel"
-            :from-node="fromNodeForAlternative"
-            :to-node="toNodeForAlternative"
-            :reason="alternativeReason"
-            :is-loading="isLoading"
-            :can-submit="!!(fromNodeForAlternative && toNodeForAlternative)"
-            @reset-selection="resetAlternativeSelection"
-            @update:reason="value => (alternativeReason = value)"
-            @submit="handleAddAlternativeSolution"
+          <template v-if="isAlternativeModeActive">
+            <AlternativePathPanel
+              :from-node="fromNodeForAlternative"
+              :to-node="toNodeForAlternative"
+              :reason="alternativeReason"
+              :is-loading="isLoading"
+              :can-submit="!!(fromNodeForAlternative && toNodeForAlternative)"
+              @reset-selection="resetAlternativeSelection"
+              @update:reason="value => (alternativeReason = value)"
+              @submit="handleAddAlternativeSolution"
+              @exit="deactivateAlternativeMode"
+            />
+          </template>
+          <UButton
+            v-else-if="hasDecisionTrees"
+            color="primary"
+            size="sm"
+            class="w-full"
+            label="Активировать альтернативный путь"
+            @click="activateAlternativeMode"
           />
-          <SkillDescription :selected-node="selectedSkillNode" />
+          <SkillDescription
+            v-if="selectedSkillNode"
+            :selected-node="selectedSkillNode"
+          />
         </div>
       </div>
     </div>

@@ -10,12 +10,14 @@ import { getScoreColorRgb } from '~/utils/colors'
 
 interface Props {
   skills: SkillNode[]
+  mode: 'default' | 'alternative'
   width?: number
   height?: number
   selectedNodeId?: string | null
   verticalGap?: number
   horizontalGap?: number
   nodeSizing?: SkillNodeSizing
+  highlightNodeIds?: string[]
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -25,6 +27,7 @@ const props = withDefaults(defineProps<Props>(), {
   verticalGap: SETTINGS.layout.verticalGap,
   horizontalGap: SETTINGS.layout.horizontalGap,
   nodeSizing: () => ({ ...SETTINGS.node }),
+  highlightNodeIds: () => [],
 })
 
 const emit = defineEmits<{
@@ -49,6 +52,7 @@ const mergeLinks = ref<
   }>
 >([])
 const nodesById = ref(new Map<string, d3.HierarchyPointNode<SkillNode>>())
+const activeNodeIds = computed(() => new Set(props.highlightNodeIds || []))
 
 const visibleTreeNodes = computed(() =>
   treeNodes.value.filter(node => !node.data.hidden),
@@ -379,12 +383,14 @@ watch(
         <g class="nodes">
           <SkillNode
             v-for="node in sortedTreeNodes"
+            :mode="mode"
             :key="node.data.id"
             :node="node"
             :node-data="node.data"
             :is-dimmed="isNodeDimmed(node)"
             :disable-label-clamp="isNodeInSelectedBranch(node)"
             :sizing="nodeSizing"
+            :is-active="activeNodeIds.has(node.data.id)"
             @click="emit('nodeClick', node.data)"
           />
         </g>

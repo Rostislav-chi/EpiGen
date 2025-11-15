@@ -15,14 +15,26 @@ const emit = defineEmits<{
   'update:reason': [value: string]
   'reset-selection': []
   submit: []
+  exit: []
 }>()
 </script>
 
 <template>
-  <div class="bg-white rounded-lg shadow p-6 w-full">
-    <h3 class="font-semibold mb-4">Добавить альтернативный путь</h3>
+  <div class="bg-white rounded-lg shadow p-6 w-full space-y-4">
+    <div class="flex items-start justify-between gap-3">
+      <h3 class="font-semibold text-base leading-6">
+        Добавить альтернативный путь
+      </h3>
+      <UButton
+        label="Выйти"
+        size="xs"
+        variant="ghost"
+        color="neutral"
+        @click="emit('exit')"
+      />
+    </div>
 
-    <div class="mb-4">
+    <div>
       <p class="text-sm text-gray-600 mb-2">
         Выберите две связанные ноды для создания альтернативного пути между
         ними:
@@ -60,7 +72,7 @@ const emit = defineEmits<{
       />
     </div>
 
-    <div class="mb-4">
+    <div>
       <UTextarea
         :model-value="props.reason"
         placeholder="Почему этот шаг трудно выполнить?"
@@ -70,14 +82,24 @@ const emit = defineEmits<{
       />
     </div>
 
-    <UButton
-      :loading="props.isLoading"
-      :disabled="!props.canSubmit"
-      @click="emit('submit')"
-      :color="props.canSubmit ? 'primary' : 'neutral'"
-      size="sm"
-      class="w-full"
-      label="Добавить альтернативный путь"
-    />
+    <div class="flex flex-col gap-2">
+      <UButton
+        :loading="props.isLoading"
+        :disabled="!props.canSubmit"
+        @click="emit('submit')"
+        :color="props.canSubmit ? 'primary' : 'neutral'"
+        size="sm"
+        class="w-full"
+        label="Добавить альтернативный путь"
+      />
+      <UButton
+        color="error"
+        variant="soft"
+        size="xs"
+        class="self-start"
+        label="Завершить режим добавления"
+        @click="emit('exit')"
+      />
+    </div>
   </div>
 </template>

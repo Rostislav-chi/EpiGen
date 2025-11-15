@@ -10,16 +10,19 @@ import {
 interface Props {
   node: d3.HierarchyPointNode<SkillNode>
   nodeData: SkillNode
+  mode: 'default' | 'alternative'
   rectWidth?: number
   rectHeight?: number
   isDimmed?: boolean
   disableLabelClamp?: boolean
   sizing?: SkillNodeSizing
+  isActive?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   sizing: () => ({ ...SETTINGS.node }),
   disableLabelClamp: false,
+  isActive: false,
 })
 
 const emit = defineEmits<{
@@ -50,7 +53,7 @@ const labelBoxStyle = computed(() => ({
 }))
 
 const nodeBackgroundFillStyle = computed(() => {
-  if (props.isDimmed) {
+  if (props.isDimmed || (props.mode === 'alternative' && !props.isActive)) {
     return { '--fill-color': STYLE.colors.dimmedFill }
   }
 
@@ -59,7 +62,7 @@ const nodeBackgroundFillStyle = computed(() => {
 })
 
 const nodeStrokeStyle = computed(() => {
-  if (props.isDimmed) {
+  if (props.isDimmed || (props.mode === 'alternative' && !props.isActive)) {
     return { '--stroke-color': STYLE.colors.dimmedStroke }
   }
 
@@ -134,7 +137,7 @@ watch(
       :y="-computedRectHeight / 2"
       :style="{ ...nodeBackgroundFillStyle, ...nodeStrokeStyle }"
       :class="[
-        'transition-all stroke-2 fill-(--fill-color) stroke-(--stroke-color)',
+        'transition-all fill-(--fill-color) stroke-(--stroke-color)',
         isDimmed ? STYLE.opacityClasses.dimmed : STYLE.opacityClasses.active,
       ]"
       rx="8"
