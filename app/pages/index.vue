@@ -1,10 +1,6 @@
 <script setup lang="ts">
 import type { SkillNode } from '~/types/skillTree'
 import { allDecisionTreesToSkillNodes } from '~/utils/decisionTreeToSkillTree'
-import {
-  SKILL_TREE_DEFAULT_SETTINGS as SETTINGS,
-  type SkillTreeSettings,
-} from '~/constants/skillTree'
 
 const { createProblem, getAllTrees, findAlternativeSolution } =
   useDecisionTree()
@@ -18,9 +14,7 @@ const isLoadingTrees = ref(true)
 const allSkillNodes = computed(() => {
   return allDecisionTreesToSkillNodes(decisionTrees.value)
 })
-const skillTreeSettings = useCookie<SkillTreeSettings>('skillTreeSettings', {
-  default: () => JSON.parse(JSON.stringify(SETTINGS)),
-})
+const { settings: skillTreeSettings } = useSkillTreeSettings()
 
 const problemDescription = ref('')
 const problemGoal = ref('')
@@ -203,7 +197,7 @@ const handleAddAlternativeSolution = async () => {
 
 <template>
   <div class="min-h-screen bg-gray-50">
-    <SkillSettingsPanel v-model="skillTreeSettings" />
+    <SkillSettingsPanel />
 
     <div class="container mx-auto px-4 py-8">
       <h1 class="text-3xl font-bold mb-8">EpiGen - Деревья решений</h1>

@@ -111,6 +111,7 @@ watch(
 
 <template>
   <g
+    v-if="!nodeData.hidden"
     :transform="`translate(${node.x},${node.y})`"
     class="cursor-pointer"
     @click.stop="handleNodeClick"

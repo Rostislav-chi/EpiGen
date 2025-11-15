@@ -45,6 +45,7 @@ export function allDecisionTreesToSkillNodes(
     parentIds: undefined,
     descriptions: ['Корневой узел для всех деревьев решений'],
     score: 0,
+    hidden: true,
   })
 
   trees.forEach(tree => {
