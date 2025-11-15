@@ -50,4 +50,3 @@ export const SKILL_NODE_STYLES = {
 export const SKILL_TREE_CONSTANTS = {
   dimmedLinkColor: 'rgba(148, 163, 184, 0.4)',
 } as const
-

@@ -51,6 +51,22 @@ const mergeLinks = ref<
 const nodesById = ref(new Map<string, d3.HierarchyPointNode<SkillNode>>())
 const nodeSizing = computed(() => props.nodeSizing)
 
+const visibleTreeNodes = computed(() =>
+  treeNodes.value.filter(node => !node.data.hidden),
+)
+
+const visibleTreeLinks = computed(() =>
+  treeLinks.value.filter(
+    link => !link.source.data.hidden && !link.target.data.hidden,
+  ),
+)
+
+const visibleMergeLinks = computed(() =>
+  mergeLinks.value.filter(
+    link => !link.source.data.hidden && !link.target.data.hidden,
+  ),
+)
+
 const highlightedIds = computed(() => {
   if (!props.selectedNodeId) {
     return new Set<string>()
@@ -85,9 +101,11 @@ const isNodeDimmed = (node?: d3.HierarchyPointNode<SkillNode>): boolean => {
 }
 
 const sortedTreeNodes = computed(() => {
-  if (!props.selectedNodeId) return treeNodes.value
+  const nodes = visibleTreeNodes.value
 
-  return [...treeNodes.value].sort((a, b) => {
+  if (!props.selectedNodeId) return nodes
+
+  return [...nodes].sort((a, b) => {
     const aHighlighted = highlightedIds.value.has(a.data.id)
     const bHighlighted = highlightedIds.value.has(b.data.id)
 
@@ -338,7 +356,7 @@ watch(
       <g>
         <g class="links">
           <path
-            v-for="(link, index) in treeLinks"
+            v-for="(link, index) in visibleTreeLinks"
             :key="`link-${index}`"
             :d="buildCurvedLinkPath(link.source, link.target)"
             fill="none"
@@ -346,7 +364,7 @@ watch(
             class="pointer-events-none stroke-2"
           />
           <path
-            v-for="(link, index) in mergeLinks"
+            v-for="(link, index) in visibleMergeLinks"
             :key="`merge-link-${index}`"
             :d="buildCurvedLinkPath(link.source, link.target)"
             fill="none"

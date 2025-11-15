@@ -1,27 +1,38 @@
 <script setup lang="ts">
 import type { SkillTreeSettings } from '~/constants/skillTree'
 
-const props = defineProps<{
-  modelValue: SkillTreeSettings
-}>()
-
-const emit = defineEmits<{
-  'update:modelValue': [SkillTreeSettings]
-}>()
+const { settings, resetSettings } = useSkillTreeSettings()
 
 const isOpen = ref(false)
 
-const cloneSettings = (settings: SkillTreeSettings): SkillTreeSettings =>
-  JSON.parse(JSON.stringify(settings))
+const cloneSettings = (value: SkillTreeSettings): SkillTreeSettings =>
+  JSON.parse(JSON.stringify(value))
 
-const localSettings = reactive(cloneSettings(props.modelValue))
+const ensureSettings = (): SkillTreeSettings => {
+  if (!settings.value) {
+    resetSettings()
+  }
+  return settings.value as SkillTreeSettings
+}
+
+const localSettings = reactive(cloneSettings(ensureSettings()))
+
+const isSyncingFromLocal = ref(false)
+const isSyncingFromStore = ref(false)
+
+const syncLocalFromStore = (value: SkillTreeSettings) => {
+  isSyncingFromStore.value = true
+  Object.assign(localSettings.viewport, value.viewport)
+  Object.assign(localSettings.layout, value.layout)
+  Object.assign(localSettings.node, value.node)
+  isSyncingFromStore.value = false
+}
 
 watch(
-  () => props.modelValue,
+  () => settings.value,
   value => {
-    Object.assign(localSettings.viewport, value.viewport)
-    Object.assign(localSettings.layout, value.layout)
-    Object.assign(localSettings.node, value.node)
+    if (!value || isSyncingFromLocal.value) return
+    syncLocalFromStore(value)
   },
   { deep: true },
 )
@@ -29,26 +40,42 @@ watch(
 watch(
   localSettings,
   value => {
-    emit('update:modelValue', cloneSettings(value))
+    if (isSyncingFromStore.value) return
+    isSyncingFromLocal.value = true
+    settings.value = cloneSettings(value)
+    isSyncingFromLocal.value = false
   },
   { deep: true },
 )
+
+const handleReset = () => {
+  resetSettings()
+}
 </script>
 
 <template>
   <div>
-    <button
-      class="fixed top-4 left-4 z-50 px-3 py-2 rounded-md bg-white shadow border text-sm font-medium hover:bg-gray-50"
+    <UButton
+      class="fixed top-4 left-4 z-50"
+      color="neutral"
+      variant="subtle"
+      :label="isOpen ? 'Close Settings' : 'Open Settings'"
       @click="isOpen = !isOpen"
-    >
-      {{ isOpen ? 'Close Settings' : 'Open Settings' }}
-    </button>
+    />
 
     <div
       v-if="isOpen"
       class="fixed top-16 left-4 w-80 z-50 bg-white rounded-xl shadow-lg border p-4 space-y-4 max-h-[80vh] overflow-y-auto"
     >
-      <h3 class="text-base font-semibold">Skill Tree Settings</h3>
+      <div class="flex items-center justify-between gap-2">
+        <h3 class="text-base font-semibold">Skill Tree Settings</h3>
+        <UButton
+          label="Reset"
+          color="error"
+          variant="outline"
+          @click="handleReset"
+        />
+      </div>
 
       <section>
         <h4 class="text-xs uppercase tracking-wide text-gray-500 mb-2">
