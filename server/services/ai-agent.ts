@@ -91,22 +91,30 @@ export class AIAgentService {
     const systemPrompt = `You are an expert in financial literacy, digital consumption, and youth well-being based on research from digiconsumers.fi publications. 
 ${KNOWLEDGE_BASE}
 
-Generate a decision tree structure in JSON format. The tree should have:
-- A root problem node
-- 2-4 intermediate solution nodes
-- 1-3 final solution nodes
-- Edges connecting nodes logically
+Generate a step-by-step instruction tree in JSON format. The tree should be a LINEAR VERTICAL STRUCTURE:
+- A root problem node (the problem title, MAXIMUM 15 characters)
+- N intermediate step nodes (concrete action steps to achieve the goal, where N is between 2 and 6)
+- 1 final goal node (the desired end result)
+
+The structure must be LINEAR: root -> step1 -> step2 -> ... -> stepN -> goal
+Each step should be concrete, actionable, and easy to understand for an average person.
+
+IMPORTANT: Determine the optimal number of steps (between 2 and 6) based on:
+- Complexity of the problem
+- Average person's attention span and comprehension
+- Need for clarity and simplicity
+- Logical progression from problem to goal
 
 Return JSON with this structure:
 {
   "rootNode": {
     "id": "string",
     "type": "problem",
-    "title": "string",
+    "title": "string (MAXIMUM 15 characters)",
     "description": "string",
     "tags": ["string"]
   },
-  "intermediateNodes": [
+  "stepNodes": [
     {
       "id": "string",
       "type": "solution",
@@ -115,30 +123,39 @@ Return JSON with this structure:
       "tags": ["string"]
     }
   ],
-  "finalNodes": [
-    {
-      "id": "string",
-      "type": "final",
-      "title": "string",
-      "description": "string",
-      "tags": ["string"]
-    }
-  ],
-  "edges": [
-    {
-      "fromNodeId": "string",
-      "toNodeId": "string",
-      "description": "string"
-    }
-  ]
-}`
+  "goalNode": {
+    "id": "string",
+    "type": "final",
+    "title": "string",
+    "description": "string",
+    "tags": ["string"]
+  }
+}
 
-    const prompt = `Create a decision tree for the following problem:
+CRITICAL REQUIREMENTS:
+- Root node title MUST be maximum 15 characters
+- Generate between 2 and 6 step nodes (choose optimal number for clarity)
+- Steps should be sequential and logical
+- Each step should be simple enough for an average person to understand
+- The instruction should be clear and actionable`
 
-Problem description: ${request.description}
+    const goalText = request.goal
+      ? `Goal: ${request.goal}`
+      : 'Generate an appropriate goal based on the problem description.'
+
+    const prompt = `Create a step-by-step instruction tree for achieving a goal:
+
+Problem: ${request.description}
+${goalText}
 ${request.tags ? `Tags: ${request.tags.join(', ')}` : ''}
 
-Generate a comprehensive decision tree with multiple solution paths based on research from digiconsumers.fi publications, especially focusing on Mette Ranta's work on financial identity and well-being.`
+Analyze the problem complexity and determine the optimal number of steps (between 2 and 6) needed to create a clear, understandable instruction for an average person. Then generate that exact number of sequential action steps that lead from the problem to the goal.
+
+Each step should be concrete, actionable, and easy to understand. The structure should be: Problem -> Step 1 -> Step 2 -> ... -> Step N -> Goal.
+
+IMPORTANT: The root node title must be maximum 15 characters.
+
+Based on research from digiconsumers.fi publications, especially focusing on Mette Ranta's work on financial identity and well-being.`
 
     const response = await this.callAI(prompt, systemPrompt)
     const treeData = JSON.parse(response)
@@ -146,44 +163,65 @@ Generate a comprehensive decision tree with multiple solution paths based on res
     const treeId = `tree_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     const now = new Date().toISOString()
 
-    const nodes: DecisionNode[] = [
-      {
-        ...treeData.rootNode,
-        metadata: {
-          source: 'digiconsumers.fi',
-          createdAt: now,
-        },
-      },
-      ...treeData.intermediateNodes.map((node: any) => ({
-        ...node,
-        metadata: {
-          source: 'digiconsumers.fi',
-          createdAt: now,
-        },
-      })),
-      ...treeData.finalNodes.map((node: any) => ({
-        ...node,
-        metadata: {
-          source: 'digiconsumers.fi',
-          createdAt: now,
-        },
-      })),
-    ]
+    const rootTitle =
+      treeData.rootNode.title.length > 15
+        ? treeData.rootNode.title.substring(0, 15)
+        : treeData.rootNode.title
 
-    const edges: DecisionEdge[] = treeData.edges.map(
-      (edge: any, index: number) => ({
+    const rootNode: DecisionNode = {
+      ...treeData.rootNode,
+      title: rootTitle,
+      metadata: {
+        source: 'digiconsumers.fi',
+        createdAt: now,
+      },
+    }
+
+    const stepNodes: DecisionNode[] = treeData.stepNodes.map((node: any) => ({
+      ...node,
+      metadata: {
+        source: 'digiconsumers.fi',
+        createdAt: now,
+      },
+    }))
+
+    const goalNode: DecisionNode = {
+      ...treeData.goalNode,
+      metadata: {
+        source: 'digiconsumers.fi',
+        createdAt: now,
+      },
+    }
+
+    const nodes: DecisionNode[] = [rootNode, ...stepNodes, goalNode]
+
+    const edges: DecisionEdge[] = []
+    let previousNodeId = rootNode.id
+
+    stepNodes.forEach((stepNode, index) => {
+      edges.push({
         id: `edge_${Date.now()}_${index}`,
-        fromNodeId: edge.fromNodeId,
-        toNodeId: edge.toNodeId,
-        description: edge.description,
+        fromNodeId: previousNodeId,
+        toNodeId: stepNode.id,
+        description: `Шаг ${index + 1}`,
         rating: 0,
         ratingCount: 0,
-      }),
-    )
+      })
+      previousNodeId = stepNode.id
+    })
+
+    edges.push({
+      id: `edge_${Date.now()}_${stepNodes.length}`,
+      fromNodeId: previousNodeId,
+      toNodeId: goalNode.id,
+      description: 'Достижение цели',
+      rating: 0,
+      ratingCount: 0,
+    })
 
     return {
       id: treeId,
-      rootNodeId: treeData.rootNode.id,
+      rootNodeId: rootNode.id,
       nodes,
       edges,
       createdAt: now,
@@ -194,11 +232,60 @@ Generate a comprehensive decision tree with multiple solution paths based on res
   async findAlternativeSolution(
     request: AlternativeSolutionRequest,
     existingTree: DecisionTree,
-  ): Promise<{ newNode: DecisionNode; newEdge: DecisionEdge }> {
+  ): Promise<{
+    newNode: DecisionNode
+    newEdge: DecisionEdge
+    secondEdges: DecisionEdge[]
+  }> {
+    const fromNode = existingTree.nodes.find(
+      (n: DecisionNode) => n.id === request.fromNodeId,
+    )
+    const toNode = existingTree.nodes.find(
+      (n: DecisionNode) => n.id === request.toNodeId,
+    )
+
+    if (!fromNode) {
+      throw new Error(`From node ${request.fromNodeId} not found in tree`)
+    }
+    if (!toNode) {
+      throw new Error(`To node ${request.toNodeId} not found in tree`)
+    }
+
+    const existingEdge = existingTree.edges.find(
+      (e: DecisionEdge) =>
+        e.fromNodeId === request.fromNodeId && e.toNodeId === request.toNodeId,
+    )
+
+    if (!existingEdge) {
+      throw new Error(
+        `Edge from ${request.fromNodeId} to ${request.toNodeId} not found`,
+      )
+    }
+
+    const nodesAfterToNode = existingTree.edges
+      .filter((e: DecisionEdge) => e.fromNodeId === request.toNodeId)
+      .map((e: DecisionEdge) => {
+        const node = existingTree.nodes.find(
+          (n: DecisionNode) => n.id === e.toNodeId,
+        )
+        return node
+      })
+      .filter((n): n is DecisionNode => n !== undefined)
+
+    if (nodesAfterToNode.length === 0) {
+      throw new Error(
+        `No nodes found after ${request.toNodeId}. Cannot create alternative path that skips this step.`,
+      )
+    }
+
     const systemPrompt = `You are an expert in financial literacy, digital consumption, and youth well-being based on research from digiconsumers.fi publications.
 ${KNOWLEDGE_BASE}
 
-Generate an alternative solution node and edge in JSON format. The solution should be different from existing solutions but still relevant to the problem context.
+Generate an alternative step node that bypasses a difficult step in a decision tree. The alternative step should:
+- Start from the same source node
+- Lead directly to the nodes that come after the skipped step
+- Skip the problematic step completely
+- Be a concrete, actionable instruction
 
 Return JSON:
 {
@@ -208,36 +295,33 @@ Return JSON:
     "title": "string",
     "description": "string",
     "tags": ["string"]
-  },
-  "edge": {
-    "fromNodeId": "string",
-    "toNodeId": "string",
-    "description": "string"
   }
 }`
 
-    const currentNode = existingTree.nodes.find(
-      (n: DecisionNode) => n.id === request.nodeId,
-    )
-    if (!currentNode) {
-      throw new Error(`Node ${request.nodeId} not found in tree`)
-    }
-
-    const existingSolutions = existingTree.nodes
-      .filter((n: DecisionNode) => n.type === 'solution' || n.type === 'final')
+    const nodesAfterText = nodesAfterToNode
       .map((n: DecisionNode) => `- ${n.title}: ${n.description}`)
       .join('\n')
 
-    const prompt = `Find an alternative solution for the following node in a decision tree:
+    const prompt = `Create an alternative step that SKIPS a difficult step in a decision tree:
 
-Current node: ${currentNode.title}
-Description: ${currentNode.description}
-${request.reason ? `Reason for alternative: ${request.reason}` : ''}
+From step: ${fromNode.title}
+Description: ${fromNode.description}
 
-Existing solutions (avoid similar approaches):
-${existingSolutions}
+Step to SKIP (bypass completely): ${toNode.title}
+Description: ${toNode.description}
 
-Generate a new alternative solution based on research from digiconsumers.fi publications, especially Mette Ranta's work.`
+Steps that come AFTER the skipped step (these are the target steps):
+${nodesAfterText}
+${request.reason ? `\nReason why the step "${toNode.title}" is difficult: ${request.reason}` : ''}
+
+Generate an alternative step that:
+- Starts from "${fromNode.title}"
+- SKIPS "${toNode.title}" completely
+- Leads directly to the steps that come after "${toNode.title}" (${nodesAfterToNode.map((n: DecisionNode) => n.title).join(', ')})
+- Is a concrete, actionable instruction that an average person can understand
+- Achieves the same goal but bypasses the problematic step
+
+Based on research from digiconsumers.fi publications, especially Mette Ranta's work.`
 
     const response = await this.callAI(prompt, systemPrompt)
     const solutionData = JSON.parse(response)
@@ -252,14 +336,25 @@ Generate a new alternative solution based on research from digiconsumers.fi publ
 
     const newEdge: DecisionEdge = {
       id: `edge_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      fromNodeId: request.nodeId,
-      toNodeId: solutionData.node.id,
-      description: solutionData.edge.description,
+      fromNodeId: request.fromNodeId,
+      toNodeId: newNode.id,
+      description: 'Альтернативный путь',
       rating: 0,
       ratingCount: 0,
     }
 
-    return { newNode, newEdge }
+    const secondEdges: DecisionEdge[] = nodesAfterToNode.map(
+      (targetNode: DecisionNode, index: number) => ({
+        id: `edge_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 9)}`,
+        fromNodeId: newNode.id,
+        toNodeId: targetNode.id,
+        description: 'Продолжение альтернативного пути',
+        rating: 0,
+        ratingCount: 0,
+      }),
+    )
+
+    return { newNode, newEdge, secondEdges }
   }
 
   async searchSimilarProblem(

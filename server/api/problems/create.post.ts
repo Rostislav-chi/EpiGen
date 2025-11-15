@@ -27,7 +27,8 @@ export default defineEventHandler(
     }
 
     const newTree = await aiAgent.createProblemTree({
-      description: body.description,
+      description: body.description.trim(),
+      goal: body.goal?.trim(),
       tags: body.tags || [],
     })
 

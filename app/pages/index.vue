@@ -10,6 +10,8 @@ const { createProblem, getAllTrees, findAlternativeSolution } =
   useDecisionTree()
 
 const selectedSkillNode = ref<SkillNode | null>(null)
+const fromNodeForAlternative = ref<SkillNode | null>(null)
+const toNodeForAlternative = ref<SkillNode | null>(null)
 const decisionTrees = ref<DecisionTree[]>([])
 const isLoadingTrees = ref(true)
 
@@ -21,6 +23,7 @@ const skillTreeSettings = useCookie<SkillTreeSettings>('skillTreeSettings', {
 })
 
 const problemDescription = ref('')
+const problemGoal = ref('')
 const tags = ref<string[]>([])
 const currentTag = ref('')
 const isLoading = ref(false)
@@ -59,8 +62,10 @@ const removeTag = (tag: string) => {
 }
 
 const handleCreateProblem = async () => {
-  if (!problemDescription.value.trim()) {
-    error.value = 'Введите описание проблемы'
+  const title = problemDescription.value.trim()
+
+  if (!title) {
+    error.value = 'Введите название проблемы'
     return
   }
 
@@ -69,7 +74,8 @@ const handleCreateProblem = async () => {
 
   try {
     const response = await createProblem({
-      description: problemDescription.value,
+      description: title,
+      goal: problemGoal.value.trim() || undefined,
       tags: tags.value,
     })
 
@@ -79,6 +85,7 @@ const handleCreateProblem = async () => {
     } else if (response.newTree) {
       decisionTrees.value.push(response.newTree)
       problemDescription.value = ''
+      problemGoal.value = ''
       tags.value = []
     }
   } catch (e: any) {
@@ -89,33 +96,75 @@ const handleCreateProblem = async () => {
 }
 
 const handleSkillNodeClick = (node: SkillNode) => {
-  selectedSkillNode.value = node
+  if (!fromNodeForAlternative.value) {
+    fromNodeForAlternative.value = node
+    selectedSkillNode.value = node
+  } else if (
+    !toNodeForAlternative.value &&
+    fromNodeForAlternative.value.id !== node.id
+  ) {
+    toNodeForAlternative.value = node
+    selectedSkillNode.value = node
+  } else {
+    selectedSkillNode.value = node
+  }
 }
 
 const handleBackgroundClick = () => {
   selectedSkillNode.value = null
 }
 
+const resetAlternativeSelection = () => {
+  fromNodeForAlternative.value = null
+  toNodeForAlternative.value = null
+}
+
 const handleAddAlternativeSolution = async () => {
-  if (!selectedSkillNode.value) {
-    error.value = 'Выберите узел для добавления альтернативного решения'
+  if (!fromNodeForAlternative.value || !toNodeForAlternative.value) {
+    error.value =
+      'Выберите две связанные ноды для создания альтернативного пути'
     return
   }
 
-  const nodeId = selectedSkillNode.value.id
-  const treeIdMatch = nodeId.match(/^(tree_\d+_\w+)-(.+)$/)
+  const fromNodeId = fromNodeForAlternative.value.id
+  const toNodeId = toNodeForAlternative.value.id
+  const fromMatch = fromNodeId.match(/^(tree_\d+_\w+)-(.+)$/)
+  const toMatch = toNodeId.match(/^(tree_\d+_\w+)-(.+)$/)
 
-  if (!treeIdMatch || !treeIdMatch[1] || !treeIdMatch[2]) {
-    error.value = 'Выбранный узел не является частью дерева решений'
+  if (
+    !fromMatch ||
+    !fromMatch[1] ||
+    !fromMatch[2] ||
+    !toMatch ||
+    !toMatch[1] ||
+    !toMatch[2]
+  ) {
+    error.value = 'Выбранные узлы не являются частью дерева решений'
     return
   }
 
-  const treeId = treeIdMatch[1]
-  const actualNodeId = treeIdMatch[2]
+  if (fromMatch[1] !== toMatch[1]) {
+    error.value = 'Узлы должны принадлежать одному дереву'
+    return
+  }
+
+  const treeId = fromMatch[1]
   const tree = decisionTrees.value.find(t => t.id === treeId)
 
   if (!tree) {
     error.value = 'Дерево не найдено'
+    return
+  }
+
+  const fromActualNodeId = fromMatch[2]
+  const toActualNodeId = toMatch[2]
+
+  const edgeExists = tree.edges.some(
+    e => e.fromNodeId === fromActualNodeId && e.toNodeId === toActualNodeId,
+  )
+
+  if (!edgeExists) {
+    error.value = 'Выбранные узлы не связаны напрямую'
     return
   }
 
@@ -124,7 +173,8 @@ const handleAddAlternativeSolution = async () => {
 
   try {
     const response = await findAlternativeSolution({
-      nodeId: actualNodeId,
+      fromNodeId: fromActualNodeId,
+      toNodeId: toActualNodeId,
       treeId: tree.id,
       reason: alternativeReason.value || undefined,
     })
@@ -136,6 +186,7 @@ const handleAddAlternativeSolution = async () => {
       decisionTrees.value[treeIndex] = response.tree
     }
     alternativeReason.value = ''
+    resetAlternativeSelection()
 
     const newNodeId = `${response.tree.id}-${response.newNodeId}`
     const newNode = allSkillNodes.value.find(n => n.id === newNodeId)
@@ -162,12 +213,22 @@ const handleAddAlternativeSolution = async () => {
 
         <div class="mb-4">
           <label class="block text-sm font-medium text-gray-700 mb-2">
-            Описание проблемы
+            Название проблемы
           </label>
-          <UTextarea
+          <UInput
             v-model="problemDescription"
-            placeholder="Опишите проблему..."
-            :rows="4"
+            placeholder="Введите название проблемы..."
+            class="w-full"
+          />
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            Конечная цель (необязательно)
+          </label>
+          <UInput
+            v-model="problemGoal"
+            placeholder="Опишите конечную цель..."
             class="w-full"
           />
         </div>
@@ -242,7 +303,12 @@ const handleAddAlternativeSolution = async () => {
           <SkillTree
             v-else-if="allSkillNodes.length > 0"
             :skills="allSkillNodes"
-            :selected-node-id="selectedSkillNode?.id ?? null"
+            :selected-node-id="
+              fromNodeForAlternative?.id ||
+              toNodeForAlternative?.id ||
+              selectedSkillNode?.id ||
+              null
+            "
             :width="skillTreeSettings.viewport.width"
             :height="skillTreeSettings.viewport.height"
             :vertical-gap="skillTreeSettings.layout.verticalGap"
@@ -266,23 +332,64 @@ const handleAddAlternativeSolution = async () => {
         v-if="selectedSkillNode && selectedSkillNode.id.includes('tree_')"
         class="mt-6 bg-white rounded-lg shadow p-6"
       >
-        <h3 class="font-semibold mb-2">Добавить альтернативное решение</h3>
-        <p class="text-sm text-gray-600 mb-2">
-          Выбран узел: {{ selectedSkillNode.label }}
-        </p>
-        <UTextarea
-          v-model="alternativeReason"
-          placeholder="Причина для альтернативного решения (необязательно)"
-          :rows="2"
-          class="mb-2"
-        />
+        <h3 class="font-semibold mb-4">Добавить альтернативный путь</h3>
+
+        <div class="mb-4">
+          <p class="text-sm text-gray-600 mb-2">
+            Выберите две связанные ноды для создания альтернативного пути между
+            ними:
+          </p>
+          <div class="space-y-2">
+            <div class="flex items-center gap-2">
+              <span class="text-sm font-medium text-gray-700">От:</span>
+              <span
+                v-if="fromNodeForAlternative"
+                class="px-3 py-1 bg-blue-100 text-blue-800 rounded text-sm"
+              >
+                {{ fromNodeForAlternative.label }}
+              </span>
+              <span v-else class="text-sm text-gray-400">Не выбрано</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-sm font-medium text-gray-700">До:</span>
+              <span
+                v-if="toNodeForAlternative"
+                class="px-3 py-1 bg-green-100 text-green-800 rounded text-sm"
+              >
+                {{ toNodeForAlternative.label }}
+              </span>
+              <span v-else class="text-sm text-gray-400">Не выбрано</span>
+            </div>
+          </div>
+          <UButton
+            v-if="fromNodeForAlternative || toNodeForAlternative"
+            @click="resetAlternativeSelection"
+            color="neutral"
+            variant="ghost"
+            size="xs"
+            class="mt-2"
+          >
+            Сбросить выбор
+          </UButton>
+        </div>
+
+        <div class="mb-4">
+          <UTextarea
+            v-model="alternativeReason"
+            placeholder="Почему этот шаг трудно выполнить? (необязательно)"
+            :rows="2"
+            class="w-full"
+          />
+        </div>
+
         <UButton
           :loading="isLoading"
+          :disabled="!fromNodeForAlternative || !toNodeForAlternative"
           @click="handleAddAlternativeSolution"
           color="primary"
           size="sm"
         >
-          Добавить альтернативное решение
+          Добавить альтернативный путь
         </UButton>
       </div>
     </div>

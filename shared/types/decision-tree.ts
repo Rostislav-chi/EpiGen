@@ -32,6 +32,8 @@ export interface DecisionTree {
 
 export interface CreateProblemRequest {
   description: string
+  goal?: string
+  stepsCount?: number
   tags?: string[]
 }
 
@@ -41,7 +43,8 @@ export interface CreateProblemResponse {
 }
 
 export interface AlternativeSolutionRequest {
-  nodeId: string
+  fromNodeId: string
+  toNodeId: string
   treeId: string
   reason?: string
 }

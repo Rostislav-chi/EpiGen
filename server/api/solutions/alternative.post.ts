@@ -5,10 +5,10 @@ export default defineEventHandler(
   async (event): Promise<AlternativeSolutionResponse> => {
     const body = await readBody<AlternativeSolutionRequest>(event)
 
-    if (!body.nodeId || !body.treeId) {
+    if (!body.fromNodeId || !body.toNodeId || !body.treeId) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'nodeId and treeId are required',
+        statusMessage: 'fromNodeId, toNodeId and treeId are required',
       })
     }
 
@@ -22,14 +22,12 @@ export default defineEventHandler(
     }
 
     const aiAgent = new AIAgentService()
-    const { newNode, newEdge } = await aiAgent.findAlternativeSolution(
-      body,
-      existingTree,
-    )
+    const { newNode, newEdge, secondEdges } =
+      await aiAgent.findAlternativeSolution(body, existingTree)
 
     const updatedTree = updateTree(body.treeId, {
       nodes: [...existingTree.nodes, newNode],
-      edges: [...existingTree.edges, newEdge],
+      edges: [...existingTree.edges, newEdge, ...secondEdges],
     })
 
     if (!updatedTree) {
