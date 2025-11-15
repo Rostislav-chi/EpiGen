@@ -278,6 +278,15 @@ Based on research from digiconsumers.fi publications, especially focusing on Met
       )
     }
 
+    const existingStepNodes = existingTree.nodes
+      .filter((n: DecisionNode) => n.type === 'solution')
+      .slice(0, 3)
+      .map(
+        (n: DecisionNode) =>
+          `Title: "${n.title}", Description: "${n.description}"`,
+      )
+      .join('\n')
+
     const systemPrompt = `You are an expert in financial literacy, digital consumption, and youth well-being based on research from digiconsumers.fi publications.
 ${KNOWLEDGE_BASE}
 
@@ -286,14 +295,18 @@ Generate an alternative step node that bypasses a difficult step in a decision t
 - Lead directly to the nodes that come after the skipped step
 - Skip the problematic step completely
 - Be a concrete, actionable instruction
+- Have the SAME format as existing step nodes (same title length, description style, etc.)
+
+Example step nodes format:
+${existingStepNodes || 'Title: "Example step", Description: "Concrete action description"'}
 
 Return JSON:
 {
   "node": {
     "id": "string",
     "type": "solution",
-    "title": "string",
-    "description": "string",
+    "title": "string (should match the format and length of existing step nodes)",
+    "description": "string (should match the format and style of existing step nodes)",
     "tags": ["string"]
   }
 }`
@@ -314,12 +327,18 @@ Steps that come AFTER the skipped step (these are the target steps):
 ${nodesAfterText}
 ${request.reason ? `\nReason why the step "${toNode.title}" is difficult: ${request.reason}` : ''}
 
+IMPORTANT: The alternative step node must have the EXACT SAME format as existing step nodes:
+- Title should be concise and match the style/length of existing step nodes
+- Description should match the format and style of existing step nodes
+- Should be a concrete, actionable instruction like other step nodes
+
 Generate an alternative step that:
 - Starts from "${fromNode.title}"
 - SKIPS "${toNode.title}" completely
 - Leads directly to the steps that come after "${toNode.title}" (${nodesAfterToNode.map((n: DecisionNode) => n.title).join(', ')})
 - Is a concrete, actionable instruction that an average person can understand
 - Achieves the same goal but bypasses the problematic step
+- Has title and description formatted EXACTLY like the existing step nodes in the tree
 
 Based on research from digiconsumers.fi publications, especially Mette Ranta's work.`
 
