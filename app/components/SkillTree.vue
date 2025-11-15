@@ -49,7 +49,6 @@ const mergeLinks = ref<
   }>
 >([])
 const nodesById = ref(new Map<string, d3.HierarchyPointNode<SkillNode>>())
-const nodeSizing = computed(() => props.nodeSizing)
 
 const visibleTreeNodes = computed(() =>
   treeNodes.value.filter(node => !node.data.hidden),
@@ -98,6 +97,13 @@ const isNodeDimmed = (node?: d3.HierarchyPointNode<SkillNode>): boolean => {
   if (!node) return true
   const nodeId = node.data.id
   return !highlightedIds.value.has(nodeId)
+}
+
+const isNodeInSelectedBranch = (
+  node?: d3.HierarchyPointNode<SkillNode>,
+): boolean => {
+  if (!props.selectedNodeId || !node) return false
+  return highlightedIds.value.has(node.data.id)
 }
 
 const sortedTreeNodes = computed(() => {
@@ -194,10 +200,6 @@ const buildTreeLayout = () => {
       })
     }
   })
-}
-
-const handleNodeClick = (node: SkillNode) => {
-  emit('nodeClick', node)
 }
 
 const checkIfNodeOrLinkClicked = (target: EventTarget | null): boolean => {
@@ -381,8 +383,9 @@ watch(
             :node="node"
             :node-data="node.data"
             :is-dimmed="isNodeDimmed(node)"
+            :disable-label-clamp="isNodeInSelectedBranch(node)"
             :sizing="nodeSizing"
-            @click="handleNodeClick"
+            @click="emit('nodeClick', node.data)"
           />
         </g>
       </g>

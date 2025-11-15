@@ -1,5 +1,6 @@
 export interface SkillNodeSizing {
   minWidth: number
+  maxWidth: number
   minHeight: number
   horizontalPadding: number
   verticalPadding: number
@@ -29,6 +30,7 @@ export const SKILL_TREE_DEFAULT_SETTINGS: SkillTreeSettings = {
   },
   node: {
     minWidth: 80,
+    maxWidth: 135,
     minHeight: 40,
     horizontalPadding: 24,
     verticalPadding: 16,

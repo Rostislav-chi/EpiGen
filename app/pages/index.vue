@@ -104,10 +104,6 @@ const handleSkillNodeClick = (node: SkillNode) => {
   }
 }
 
-const handleBackgroundClick = () => {
-  selectedSkillNode.value = null
-}
-
 const resetAlternativeSelection = () => {
   fromNodeForAlternative.value = null
   toNodeForAlternative.value = null
@@ -197,8 +193,6 @@ const handleAddAlternativeSolution = async () => {
 
 <template>
   <div class="min-h-screen bg-gray-50">
-    <SkillSettingsPanel />
-
     <div class="container mx-auto px-4 py-8">
       <h1 class="text-3xl font-bold mb-8">EpiGen - Деревья решений</h1>
 
@@ -308,8 +302,8 @@ const handleAddAlternativeSolution = async () => {
             :vertical-gap="skillTreeSettings.layout.verticalGap"
             :horizontal-gap="skillTreeSettings.layout.horizontalGap"
             :node-sizing="skillTreeSettings.node"
+            @background-click="selectedSkillNode = null"
             @node-click="handleSkillNodeClick"
-            @background-click="handleBackgroundClick"
           />
           <div
             v-else

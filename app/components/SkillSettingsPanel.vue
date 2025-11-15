@@ -47,16 +47,11 @@ watch(
   },
   { deep: true },
 )
-
-const handleReset = () => {
-  resetSettings()
-}
 </script>
 
 <template>
   <div>
     <UButton
-      class="fixed top-4 left-4 z-50"
       color="neutral"
       variant="outline"
       :label="isOpen ? 'Close Settings' : 'Open Settings'"
@@ -65,7 +60,7 @@ const handleReset = () => {
 
     <div
       v-if="isOpen"
-      class="fixed top-16 left-4 w-80 z-50 bg-white rounded-xl shadow-lg border p-4 space-y-4 max-h-[80vh] overflow-y-auto"
+      class="fixed top-16 right-4 w-80 z-50 bg-white rounded-xl shadow-lg border p-4 space-y-4 max-h-[80vh] overflow-y-auto"
     >
       <div class="flex items-center justify-between gap-2">
         <h3 class="text-base font-semibold">Skill Tree Settings</h3>
@@ -73,7 +68,7 @@ const handleReset = () => {
           label="Reset"
           color="error"
           variant="outline"
-          @click="handleReset"
+          @click="resetSettings"
         />
       </div>
 
@@ -140,6 +135,15 @@ const handleReset = () => {
               v-model.number="localSettings.node.minWidth"
               type="number"
               min="40"
+              class="w-full border rounded px-2 py-1 text-sm focus:outline-none focus:ring"
+            />
+          </label>
+          <label class="text-xs font-medium text-gray-600 flex flex-col gap-1">
+            Max Width
+            <input
+              v-model.number="localSettings.node.maxWidth"
+              type="number"
+              min="80"
               class="w-full border rounded px-2 py-1 text-sm focus:outline-none focus:ring"
             />
           </label>

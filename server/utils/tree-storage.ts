@@ -1,5 +1,10 @@
 const trees: Map<string, DecisionTree> = new Map()
 
+type SearchQuery = {
+  description?: string
+  tags?: string[]
+}
+
 export function saveTree(tree: DecisionTree): void {
   trees.set(tree.id, tree)
 }
@@ -31,10 +36,7 @@ export function updateTree(
   return updatedTree
 }
 
-export function searchTrees(query: {
-  description?: string
-  tags?: string[]
-}): DecisionTree[] {
+export function searchTrees(query: SearchQuery): DecisionTree[] {
   const allTrees = getAllTrees()
 
   if (!query.description && !query.tags) {
@@ -71,10 +73,7 @@ export function searchTrees(query: {
   })
 }
 
-export function searchNodes(query: {
-  description?: string
-  tags?: string[]
-}): DecisionTree['nodes'] {
+export function searchNodes(query: SearchQuery): DecisionTree['nodes'] {
   const allTrees = getAllTrees()
   const allNodes: DecisionTree['nodes'] = []
 

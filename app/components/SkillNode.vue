@@ -13,11 +13,13 @@ interface Props {
   rectWidth?: number
   rectHeight?: number
   isDimmed?: boolean
+  disableLabelClamp?: boolean
   sizing?: SkillNodeSizing
 }
 
 const props = withDefaults(defineProps<Props>(), {
   sizing: () => ({ ...SETTINGS.node }),
+  disableLabelClamp: false,
 })
 
 const emit = defineEmits<{
@@ -42,6 +44,11 @@ const computedRectHeight = computed(
     Math.max(props.sizing.minHeight, measuredSize.value.height),
 )
 
+const labelBoxStyle = computed(() => ({
+  fontSize: `${props.sizing.fontSize}px`,
+  padding: `${props.sizing.verticalPadding / 2}px ${props.sizing.horizontalPadding / 2}px`,
+}))
+
 const nodeBackgroundFillStyle = computed(() => {
   if (props.isDimmed) {
     return { '--fill-color': STYLE.colors.dimmedFill }
@@ -60,29 +67,26 @@ const nodeStrokeStyle = computed(() => {
   return { '--stroke-color': `rgb(${rgb})` }
 })
 
-const nodeTextClass = computed(() =>
-  props.isDimmed ? 'fill-gray-400' : 'fill-gray-800',
-)
-
-const nodeExtraVisualClass = computed(() =>
-  props.isDimmed ? STYLE.opacityClasses.dimmed : STYLE.opacityClasses.active,
-)
-
-const nodeTextStyle = computed(() => ({
-  fontSize: `${props.sizing.fontSize}px`,
-}))
-
 const measureLabel = () => {
   if (!textRef.value || props.rectWidth || props.rectHeight) return
   const bbox = textRef.value.getBBox()
-  measuredSize.value = {
-    width: bbox.width + props.sizing.horizontalPadding,
-    height: bbox.height + props.sizing.verticalPadding,
-  }
-}
+  const widthWithPadding = bbox.width + props.sizing.horizontalPadding
+  const heightWithPadding = bbox.height + props.sizing.verticalPadding
 
-const handleNodeClick = () => {
-  emit('click', props.nodeData)
+  const effectiveMaxWidth = Math.max(
+    props.disableLabelClamp ? Number.POSITIVE_INFINITY : props.sizing.maxWidth,
+    props.sizing.minWidth,
+  )
+
+  const clampedWidth = Math.min(
+    Math.max(props.sizing.minWidth, widthWithPadding),
+    effectiveMaxWidth,
+  )
+
+  measuredSize.value = {
+    width: clampedWidth,
+    height: Math.max(props.sizing.minHeight, heightWithPadding),
+  }
 }
 
 onMounted(() => {
@@ -107,6 +111,13 @@ watch(
   },
   { deep: true },
 )
+
+watch(
+  () => props.disableLabelClamp,
+  () => {
+    nextTick(() => measureLabel())
+  },
+)
 </script>
 
 <template>
@@ -114,7 +125,7 @@ watch(
     v-if="!nodeData.hidden"
     :transform="`translate(${node.x},${node.y})`"
     class="cursor-pointer"
-    @click.stop="handleNodeClick"
+    @click.stop="emit('click', nodeData)"
   >
     <rect
       :width="computedRectWidth"
@@ -124,10 +135,31 @@ watch(
       :style="{ ...nodeBackgroundFillStyle, ...nodeStrokeStyle }"
       :class="[
         'transition-all stroke-2 fill-(--fill-color) stroke-(--stroke-color)',
-        nodeExtraVisualClass,
+        isDimmed ? STYLE.opacityClasses.dimmed : STYLE.opacityClasses.active,
       ]"
       rx="8"
     />
+
+    <foreignObject
+      :width="computedRectWidth"
+      :height="computedRectHeight"
+      :x="-computedRectWidth / 2"
+      :y="-computedRectHeight / 2"
+      class="pointer-events-none"
+    >
+      <div
+        xmlns="http://www.w3.org/1999/xhtml"
+        :class="[
+          'w-full h-full flex items-center justify-center font-semibold',
+          isDimmed ? 'text-gray-400' : 'text-gray-800',
+        ]"
+        :style="labelBoxStyle"
+      >
+        <span class="truncate w-full text-center block">
+          {{ nodeData.label }}
+        </span>
+      </div>
+    </foreignObject>
 
     <text
       ref="textRef"
@@ -135,8 +167,7 @@ watch(
       :y="0"
       text-anchor="middle"
       dominant-baseline="middle"
-      :class="['font-semibold pointer-events-none px-2', nodeTextClass]"
-      :style="nodeTextStyle"
+      class="opacity-0 pointer-events-none select-none"
     >
       {{ nodeData.label }}
     </text>
