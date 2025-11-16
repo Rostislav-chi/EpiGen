@@ -162,4 +162,22 @@ const handleCreateProblem = async () => {
       />
     </div>
   </div>
+
+  <div class="flex flex-col gap-2.5">
+    <span class="text-muted mb-2"> EXAMPLE PROBLEMS </span>
+
+    <span
+      v-for="(text, i) in [
+        'I want to start investing but don\'t know where to begin',
+        'I have credit card debt and need help managing it',
+        'I want to create a budget but feel overwhelmed',
+        'I need to understand retirement planning options',
+      ]"
+      :key="i"
+      class="text-sm text-toned p-4 border border-muted rounded-lg cursor-pointer hover:bg-muted hover:text-highlighted transition-all duration-300"
+      @click="problemDescription = text"
+    >
+      {{ text }}
+    </span>
+  </div>
 </template>
