@@ -49,10 +49,10 @@ const loadLatestTree = async () => {
     const tree = await getLatestTree()
     currentTree.value = tree
   } catch (e: any) {
-    console.error('Ошибка при загрузке дерева:', e)
+    console.error('Failed to load trees:', e)
     toast.add({
-      title: 'Не удалось загрузить дерево',
-      description: e?.message || 'Попробуйте ещё раз позже',
+      title: 'Failed to load trees',
+      description: e?.message || 'Please try again later',
       color: 'error',
     })
   } finally {
@@ -127,7 +127,7 @@ const deactivateAlternativeMode = () => {
 const handleAddAlternativeSolution = async () => {
   if (!isAlternativeModeActive.value) {
     toast.add({
-      title: 'Активируйте режим альтернативного пути',
+      title: 'Activate alternative path mode',
       color: 'warning',
     })
     return
@@ -135,8 +135,8 @@ const handleAddAlternativeSolution = async () => {
 
   if (!fromNodeForAlternative.value || !toNodeForAlternative.value) {
     toast.add({
-      title: 'Выберите обе ноды',
-      description: 'Нужно указать начало и конец альтернативного пути',
+      title: 'Select both nodes',
+      description: 'Please specify the start and end of the alternative path',
       color: 'warning',
     })
     return
@@ -156,8 +156,8 @@ const handleAddAlternativeSolution = async () => {
     !toMatch[2]
   ) {
     toast.add({
-      title: 'Неверный узел',
-      description: 'Выбранная нода не принадлежит дереву',
+      title: 'Invalid node',
+      description: 'The selected node does not belong to the tree',
       color: 'warning',
     })
     return
@@ -165,7 +165,7 @@ const handleAddAlternativeSolution = async () => {
 
   if (fromMatch[1] !== toMatch[1]) {
     toast.add({
-      title: 'Выберите ноды одного дерева',
+      title: 'Select nodes from the same tree',
       color: 'warning',
     })
     return
@@ -175,7 +175,7 @@ const handleAddAlternativeSolution = async () => {
 
   if (!currentTree.value || currentTree.value.id !== treeId) {
     toast.add({
-      title: 'Дерево не найдено',
+      title: 'Tree not found',
       color: 'error',
     })
     return
@@ -190,8 +190,8 @@ const handleAddAlternativeSolution = async () => {
 
   if (!edgeExists) {
     toast.add({
-      title: 'Нет прямой связи',
-      description: 'Эти ноды не соединены',
+      title: 'No direct connection',
+      description: 'These nodes are not connected',
       color: 'warning',
     })
     return
@@ -218,8 +218,8 @@ const handleAddAlternativeSolution = async () => {
     }
   } catch (e: any) {
     toast.add({
-      title: 'Не удалось добавить альтернативный путь',
-      description: e?.message || 'Попробуйте ещё раз позже',
+      title: 'Could not add alternative path',
+      description: e?.message || 'Please try again later',
       color: 'error',
     })
   } finally {
