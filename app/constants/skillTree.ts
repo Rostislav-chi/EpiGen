@@ -21,12 +21,12 @@ export interface SkillTreeSettings {
 
 export const SKILL_TREE_DEFAULT_SETTINGS: SkillTreeSettings = {
   viewport: {
-    width: 1280,
-    height: 832,
+    width: 800,
+    height: 600,
   },
   layout: {
-    verticalGap: 120,
-    horizontalGap: 160,
+    verticalGap: 100,
+    horizontalGap: 60,
   },
   node: {
     minWidth: 80,

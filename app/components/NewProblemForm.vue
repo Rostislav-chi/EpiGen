@@ -146,7 +146,7 @@ const handleCreateProblem = async () => {
     <div class="flex justify-between items-center">
       <span class="text-sm text-muted">
         {{ problemDescription.length }}
-        {{ `characters${problemDescription.length > 1 ? 's' : ''}` }}
+        {{ `character${problemDescription.length > 1 ? 's' : ''}` }}
       </span>
 
       <UButton
