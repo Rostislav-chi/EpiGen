@@ -21,7 +21,28 @@ const allSkillNodes = computed(() => {
 const { settings: skillTreeSettings } = useSkillTreeSettings()
 
 const isLoading = ref(false)
+const isTreeFullscreen = ref(false)
 const alternativeReason = ref('')
+const previousScrollY = ref(0)
+const decisionTreeRef = ref<HTMLElement | null>(null)
+const fullscreenViewportHeight = ref(
+  skillTreeSettings.value.viewport.height ?? 600,
+)
+
+const updateFullscreenViewportHeight = () => {
+  if (typeof window === 'undefined') return
+  const baseHeight = skillTreeSettings.value.viewport.height ?? 600
+  fullscreenViewportHeight.value = Math.max(
+    baseHeight,
+    window.innerHeight - 120,
+  )
+}
+
+const computedTreeHeight = computed(() =>
+  isTreeFullscreen.value
+    ? fullscreenViewportHeight.value
+    : skillTreeSettings.value.viewport.height,
+)
 const hasDecisionTrees = computed(() => !!currentTree.value)
 const highlightedAlternativeNodeIds = computed(() => {
   if (!isAlternativeModeActive.value) {
@@ -62,6 +83,13 @@ const loadLatestTree = async () => {
 
 onMounted(() => {
   loadLatestTree()
+  updateFullscreenViewportHeight()
+  window.addEventListener('resize', updateFullscreenViewportHeight)
+})
+
+onBeforeUnmount(() => {
+  if (typeof window === 'undefined') return
+  window.removeEventListener('resize', updateFullscreenViewportHeight)
 })
 
 const ensureFromBeforeTo = () => {
@@ -122,6 +150,38 @@ const deactivateAlternativeMode = () => {
   isAlternativeModeActive.value = false
   resetAlternativeSelection()
   alternativeReason.value = ''
+}
+
+const toggleTreeFullscreen = async () => {
+  const isEntering = !isTreeFullscreen.value
+
+  if (typeof window !== 'undefined' && isEntering) {
+    previousScrollY.value = window.scrollY
+    updateFullscreenViewportHeight()
+  }
+
+  isTreeFullscreen.value = !isTreeFullscreen.value
+
+  if (typeof window !== 'undefined' && !isTreeFullscreen.value) {
+    await nextTick()
+    window.scrollTo({ top: previousScrollY.value, behavior: 'auto' })
+  }
+}
+
+const scrollToDecisionTree = () => {
+  if (typeof window === 'undefined' || !decisionTreeRef.value) return
+
+  nextTick(() => {
+    decisionTreeRef.value?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    })
+  })
+}
+
+const handleNewTreeCreated = (newTree: DecisionTree) => {
+  currentTree.value = newTree
+  scrollToDecisionTree()
 }
 
 const handleAddAlternativeSolution = async () => {
@@ -250,89 +310,114 @@ const handleAddAlternativeSolution = async () => {
     </div>
 
     <NewProblemForm
-      @decision-trees="(newTree: DecisionTree) => (currentTree = newTree)"
+      @decision-trees="handleNewTreeCreated"
       @load-all-trees="loadLatestTree"
     />
 
-    <div class="relative">
-      <UCard>
-        <template #header>
-          <div class="flex justify-between items-center">
-            <h2 class="text-xl font-semibold">Decision Tree</h2>
-            <UButton
-              :loading="isLoadingTrees"
-              @click="loadLatestTree"
-              color="neutral"
-              variant="ghost"
-              size="sm"
+    <div
+      ref="decisionTreeRef"
+      :class="[
+        isTreeFullscreen
+          ? 'fixed inset-0 z-50 bg-default/95 backdrop-blur-sm overflow-auto p-4'
+          : 'relative',
+      ]"
+    >
+      <div class="relative">
+        <UCard :ui="{ body: 'p-0 sm:p-0' }">
+          <template #header>
+            <div class="flex justify-between items-center">
+              <h2 class="text-xl font-semibold">Decision Tree</h2>
+              <div class="flex items-center gap-2">
+                <UButton
+                  :loading="isLoadingTrees"
+                  @click="loadLatestTree"
+                  color="neutral"
+                  variant="ghost"
+                  size="sm"
+                >
+                  Refresh
+                </UButton>
+                <UButton
+                  :icon="
+                    isTreeFullscreen
+                      ? 'i-lucide-minimize-2'
+                      : 'i-lucide-maximize-2'
+                  "
+                  color="neutral"
+                  variant="ghost"
+                  size="sm"
+                  @click="toggleTreeFullscreen"
+                >
+                  {{ isTreeFullscreen ? 'Exit full screen' : 'Full screen' }}
+                </UButton>
+              </div>
+            </div>
+          </template>
+          <div class="w-full h-full bg-default">
+            <div
+              v-if="isLoadingTrees"
+              class="flex items-center justify-center"
+              :style="{ height: `${computedTreeHeight}px` }"
             >
-              Refresh
-            </UButton>
+              <div class="text-dimmed">Loading trees...</div>
+            </div>
+            <SkillTree
+              v-else-if="allSkillNodes.length > 0"
+              :skills="allSkillNodes"
+              :mode="isAlternativeModeActive ? 'alternative' : 'default'"
+              :selected-node-id="
+                isAlternativeModeActive ? null : (selectedSkillNode?.id ?? null)
+              "
+              :highlight-node-ids="highlightedAlternativeNodeIds"
+              :width="skillTreeSettings.viewport.width"
+              :height="computedTreeHeight"
+              :vertical-gap="skillTreeSettings.layout.verticalGap"
+              :horizontal-gap="skillTreeSettings.layout.horizontalGap"
+              :node-sizing="skillTreeSettings.node"
+              @background-click="selectedSkillNode = null"
+              @node-click="handleSkillNodeClick"
+            />
+            <div
+              v-else
+              class="flex items-center justify-center text-dimmed"
+              :style="{ height: `${computedTreeHeight}px` }"
+            >
+              No trees yet. Create a problem to get started.
+            </div>
           </div>
-        </template>
-        <div class="w-full h-full bg-white">
-          <div
-            v-if="isLoadingTrees"
-            class="flex items-center justify-center"
-            :style="{ height: `${skillTreeSettings.viewport.height}px` }"
-          >
-            <div class="text-gray-400">Loading trees...</div>
-          </div>
-          <SkillTree
-            v-else-if="allSkillNodes.length > 0"
-            :skills="allSkillNodes"
-            :mode="isAlternativeModeActive ? 'alternative' : 'default'"
-            :selected-node-id="
-              isAlternativeModeActive ? null : (selectedSkillNode?.id ?? null)
-            "
-            :highlight-node-ids="highlightedAlternativeNodeIds"
-            :width="skillTreeSettings.viewport.width"
-            :height="skillTreeSettings.viewport.height"
-            :vertical-gap="skillTreeSettings.layout.verticalGap"
-            :horizontal-gap="skillTreeSettings.layout.horizontalGap"
-            :node-sizing="skillTreeSettings.node"
-            @background-click="selectedSkillNode = null"
-            @node-click="handleSkillNodeClick"
-          />
-          <div
-            v-else
-            class="flex items-center justify-center text-gray-400"
-            :style="{ height: `${skillTreeSettings.viewport.height}px` }"
-          >
-            No trees yet. Create a problem to get started.
-          </div>
-        </div>
-      </UCard>
+        </UCard>
 
-      <div
-        v-if="shouldShowSidebar"
-        class="absolute top-16 right-1 w-[350px] z-10 flex flex-col items-end gap-4"
-      >
-        <template v-if="isAlternativeModeActive">
-          <AlternativePathPanel
-            :from-node="fromNodeForAlternative"
-            :to-node="toNodeForAlternative"
-            :reason="alternativeReason"
-            :is-loading="isLoading"
-            :can-submit="!!(fromNodeForAlternative && toNodeForAlternative)"
-            @reset-selection="resetAlternativeSelection"
-            @update:reason="value => (alternativeReason = value)"
-            @submit="handleAddAlternativeSolution"
-            @exit="deactivateAlternativeMode"
+        <div
+          v-if="shouldShowSidebar"
+          class="absolute top-16 right-1 w-[350px] z-10 flex flex-col items-end gap-4"
+        >
+          <template v-if="isAlternativeModeActive">
+            <AlternativePathPanel
+              :from-node="fromNodeForAlternative"
+              :to-node="toNodeForAlternative"
+              :reason="alternativeReason"
+              :is-loading="isLoading"
+              :can-submit="!!(fromNodeForAlternative && toNodeForAlternative)"
+              @reset-selection="resetAlternativeSelection"
+              @update:reason="value => (alternativeReason = value)"
+              @submit="handleAddAlternativeSolution"
+              @exit="deactivateAlternativeMode"
+            />
+          </template>
+          <UButton
+            v-else-if="hasDecisionTrees"
+            color="secondary"
+            variant="soft"
+            size="sm"
+            class="w-fit"
+            label="Enable alternative path mode"
+            @click="activateAlternativeMode"
           />
-        </template>
-        <UButton
-          v-else-if="hasDecisionTrees"
-          color="primary"
-          size="sm"
-          class="w-fit"
-          label="Enable alternative path mode"
-          @click="activateAlternativeMode"
-        />
-        <SkillDescription
-          v-if="selectedSkillNode"
-          :selected-node="selectedSkillNode"
-        />
+          <SkillDescription
+            v-if="selectedSkillNode"
+            :selected-node="selectedSkillNode"
+          />
+        </div>
       </div>
     </div>
   </div>
