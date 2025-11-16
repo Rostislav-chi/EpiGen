@@ -487,11 +487,18 @@ watch(
     () => props.height,
     () => props.verticalGap,
     () => props.horizontalGap,
-    () => props.selectedNodeId,
     () => props.nodeSizing,
   ],
   () => {
     applyViewportDimensions()
+    buildTreeLayout()
+  },
+  { deep: true },
+)
+
+watch(
+  () => props.selectedNodeId,
+  () => {
     buildTreeLayout()
   },
 )
