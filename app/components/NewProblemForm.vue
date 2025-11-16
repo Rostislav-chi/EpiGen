@@ -74,7 +74,7 @@ const handleCreateProblem = async () => {
 
 <template>
   <div
-    class="flex flex-col gap-4 bg-default border border-muted rounded-2xl shadow-lg px-6 py-8"
+    class="flex flex-col gap-4 bg-default border border-muted rounded-2xl shadow-lg p-8"
   >
     <div class="flex flex-col gap-2">
       <span class="text-sm"> What challenge are you facing? </span>
@@ -155,7 +155,7 @@ const handleCreateProblem = async () => {
           base: 'px-4 py-2 bg-gradient-to-r from-sky-400 via-indigo-400 to-fuchsia-500 hover:opacity-75 disabled:opacity-50',
           leadingIcon: 'size-4',
         }"
-        icon="i-lucide-star"
+        icon="i-lucide-sparkles"
         :loading="isLoading"
         label="Generate Solution Map"
         @click="handleCreateProblem"
