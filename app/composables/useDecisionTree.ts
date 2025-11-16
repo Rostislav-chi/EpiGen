@@ -19,13 +19,13 @@ export const useDecisionTree = () => {
 
   const getTree = (id: string) => $fetch(`/api/trees/${id}`)
 
-  const getAllTrees = () => $fetch('/api/trees')
+  const getLatestTree = () => $fetch<DecisionTree | null>('/api/trees')
 
   return {
     createProblem,
     findAlternativeSolution,
     search,
     getTree,
-    getAllTrees,
+    getLatestTree,
   }
 }

@@ -1,7 +1,9 @@
 import { getTree } from '~~/server/utils/tree-storage'
+import { getClientId } from '~~/server/utils/client-id'
 
 export default defineEventHandler(async (event): Promise<DecisionTree> => {
   const id = getRouterParam(event, 'id')
+  const clientId = getClientId(event)
 
   if (!id) {
     throw createError({
@@ -10,7 +12,7 @@ export default defineEventHandler(async (event): Promise<DecisionTree> => {
     })
   }
 
-  const tree = getTree(id)
+  const tree = getTree(id, clientId)
 
   if (!tree) {
     throw createError({

@@ -1,9 +1,11 @@
 import { AIAgentService } from '~~/server/services/ai-agent'
 import { saveTree, getAllTrees } from '~~/server/utils/tree-storage'
+import { getClientId } from '~~/server/utils/client-id'
 
 export default defineEventHandler(
   async (event): Promise<CreateProblemResponse> => {
     const body = await readBody<CreateProblemRequest>(event)
+    const clientId = getClientId(event)
 
     if (!body.description || body.description.trim().length === 0) {
       throw createError({
@@ -13,7 +15,7 @@ export default defineEventHandler(
     }
 
     const aiAgent = new AIAgentService()
-    const existingTrees = getAllTrees()
+    const existingTrees = getAllTrees(clientId)
 
     const similarTree = await aiAgent.searchSimilarProblem(
       body.description,
@@ -32,7 +34,7 @@ export default defineEventHandler(
       tags: body.tags || [],
     })
 
-    saveTree(newTree)
+    saveTree(newTree, clientId)
 
     return {
       newTree,

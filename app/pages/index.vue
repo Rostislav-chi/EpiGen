@@ -1,18 +1,22 @@
 <script setup lang="ts">
 import type { SkillNode } from '~/types/skillTree'
+import { decisionTreeToSkillNodes } from '~/utils/decisionTreeToSkillTree'
 
-const { getAllTrees, findAlternativeSolution } = useDecisionTree()
+const { getLatestTree, findAlternativeSolution } = useDecisionTree()
 const toast = useToast()
 
 const selectedSkillNode = ref<SkillNode | null>(null)
 const fromNodeForAlternative = ref<SkillNode | null>(null)
 const toNodeForAlternative = ref<SkillNode | null>(null)
 const isAlternativeModeActive = ref(false)
-const decisionTrees = ref<DecisionTree[]>([])
+const currentTree = ref<DecisionTree | null>(null)
 const isLoadingTrees = ref(true)
 
 const allSkillNodes = computed(() => {
-  return allDecisionTreesToSkillNodes(decisionTrees.value)
+  if (!currentTree.value) {
+    return []
+  }
+  return decisionTreeToSkillNodes(currentTree.value)
 })
 const { settings: skillTreeSettings } = useSkillTreeSettings()
 
@@ -38,7 +42,7 @@ const computedTreeHeight = computed(() =>
     ? fullscreenViewportHeight.value
     : skillTreeSettings.value.viewport.height,
 )
-const hasDecisionTrees = computed(() => decisionTrees.value.length > 0)
+const hasDecisionTrees = computed(() => !!currentTree.value)
 const highlightedAlternativeNodeIds = computed(() => {
   if (!isAlternativeModeActive.value) {
     return []
@@ -59,11 +63,11 @@ const shouldShowSidebar = computed(
     hasDecisionTrees.value,
 )
 
-const loadAllTrees = async () => {
+const loadLatestTree = async () => {
   isLoadingTrees.value = true
   try {
-    const trees = await getAllTrees()
-    decisionTrees.value = trees
+    const tree = await getLatestTree()
+    currentTree.value = tree
   } catch (e: any) {
     console.error('Failed to load trees:', e)
     toast.add({
@@ -77,7 +81,7 @@ const loadAllTrees = async () => {
 }
 
 onMounted(() => {
-  loadAllTrees()
+  loadLatestTree()
   updateFullscreenViewportHeight()
   window.addEventListener('resize', updateFullscreenViewportHeight)
 })
@@ -211,9 +215,8 @@ const handleAddAlternativeSolution = async () => {
   }
 
   const treeId = fromMatch[1]
-  const tree = decisionTrees.value.find(t => t.id === treeId)
 
-  if (!tree) {
+  if (!currentTree.value || currentTree.value.id !== treeId) {
     toast.add({
       title: 'Tree not found',
       color: 'error',
@@ -224,7 +227,7 @@ const handleAddAlternativeSolution = async () => {
   const fromActualNodeId = fromMatch[2]
   const toActualNodeId = toMatch[2]
 
-  const edgeExists = tree.edges.some(
+  const edgeExists = currentTree.value.edges.some(
     e => e.fromNodeId === fromActualNodeId && e.toNodeId === toActualNodeId,
   )
 
@@ -243,16 +246,11 @@ const handleAddAlternativeSolution = async () => {
     const response = await findAlternativeSolution({
       fromNodeId: fromActualNodeId,
       toNodeId: toActualNodeId,
-      treeId: tree.id,
+      treeId: currentTree.value.id,
       reason: alternativeReason.value || undefined,
     })
 
-    const treeIndex = decisionTrees.value.findIndex(
-      t => t.id === response.tree.id,
-    )
-    if (treeIndex !== -1) {
-      decisionTrees.value[treeIndex] = response.tree
-    }
+    currentTree.value = response.tree
     alternativeReason.value = ''
     deactivateAlternativeMode()
 
@@ -295,8 +293,8 @@ const handleAddAlternativeSolution = async () => {
     </div>
 
     <NewProblemForm
-      @decision-trees="newTree => decisionTrees.push(newTree)"
-      @load-all-trees="loadAllTrees"
+      @decision-trees="(newTree: DecisionTree) => (currentTree = newTree)"
+      @load-all-trees="loadLatestTree"
     />
 
     <div
@@ -310,13 +308,11 @@ const handleAddAlternativeSolution = async () => {
         <UCard :ui="{ body: 'p-0 sm:p-0' }">
           <template #header>
             <div class="flex justify-between items-center">
-              <h2 class="text-xl font-semibold">
-                Decision Trees ({{ decisionTrees.length }})
-              </h2>
+              <h2 class="text-xl font-semibold">Decision Tree</h2>
               <div class="flex items-center gap-2">
                 <UButton
                   :loading="isLoadingTrees"
-                  @click="loadAllTrees"
+                  @click="loadLatestTree"
                   color="neutral"
                   variant="ghost"
                   size="sm"

@@ -1,11 +1,13 @@
 import { searchTrees, searchNodes } from '~~/server/utils/tree-storage'
+import { getClientId } from '~~/server/utils/client-id'
 
 export default defineEventHandler(async (event): Promise<SearchResponse> => {
   const { description, tags, limit = 50 } = await readBody<SearchRequest>(event)
+  const clientId = getClientId(event)
 
   const query = { description, tags }
-  const trees = searchTrees(query)
-  const nodes = searchNodes(query)
+  const trees = searchTrees(query, clientId)
+  const nodes = searchNodes(query, clientId)
 
   return {
     trees: trees.slice(0, limit),
