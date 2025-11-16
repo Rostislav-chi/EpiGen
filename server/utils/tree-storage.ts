@@ -1,27 +1,53 @@
-const trees: Map<string, DecisionTree> = new Map()
+const treesByClient: Map<string, Map<string, DecisionTree>> = new Map()
 
 type SearchQuery = {
   description?: string
   tags?: string[]
 }
 
-export function saveTree(tree: DecisionTree): void {
-  trees.set(tree.id, tree)
+function getClientTrees(clientId: string): Map<string, DecisionTree> {
+  if (!treesByClient.has(clientId)) {
+    treesByClient.set(clientId, new Map())
+  }
+  return treesByClient.get(clientId)!
 }
 
-export function getTree(id: string): DecisionTree | undefined {
-  return trees.get(id)
+export function saveTree(tree: DecisionTree, clientId: string): void {
+  const clientTrees = getClientTrees(clientId)
+  clientTrees.set(tree.id, tree)
 }
 
-export function getAllTrees(): DecisionTree[] {
-  return Array.from(trees.values())
+export function getTree(
+  id: string,
+  clientId: string,
+): DecisionTree | undefined {
+  const clientTrees = getClientTrees(clientId)
+  return clientTrees.get(id)
+}
+
+export function getAllTrees(clientId: string): DecisionTree[] {
+  const clientTrees = getClientTrees(clientId)
+  return Array.from(clientTrees.values())
+}
+
+export function getLatestTree(clientId: string): DecisionTree | null {
+  const clientTrees = getClientTrees(clientId)
+  const trees = Array.from(clientTrees.values())
+  if (trees.length === 0) {
+    return null
+  }
+  return trees.sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  )[0]
 }
 
 export function updateTree(
   id: string,
   updates: Partial<DecisionTree>,
+  clientId: string,
 ): DecisionTree | null {
-  const tree = trees.get(id)
+  const clientTrees = getClientTrees(clientId)
+  const tree = clientTrees.get(id)
   if (!tree) {
     return null
   }
@@ -32,12 +58,15 @@ export function updateTree(
     updatedAt: new Date().toISOString(),
   }
 
-  trees.set(id, updatedTree)
+  clientTrees.set(id, updatedTree)
   return updatedTree
 }
 
-export function searchTrees(query: SearchQuery): DecisionTree[] {
-  const allTrees = getAllTrees()
+export function searchTrees(
+  query: SearchQuery,
+  clientId: string,
+): DecisionTree[] {
+  const allTrees = getAllTrees(clientId)
 
   if (!query.description && !query.tags) {
     return allTrees
@@ -73,8 +102,11 @@ export function searchTrees(query: SearchQuery): DecisionTree[] {
   })
 }
 
-export function searchNodes(query: SearchQuery): DecisionTree['nodes'] {
-  const allTrees = getAllTrees()
+export function searchNodes(
+  query: SearchQuery,
+  clientId: string,
+): DecisionTree['nodes'] {
+  const allTrees = getAllTrees(clientId)
   const allNodes: DecisionTree['nodes'] = []
 
   allTrees.forEach(tree => {
